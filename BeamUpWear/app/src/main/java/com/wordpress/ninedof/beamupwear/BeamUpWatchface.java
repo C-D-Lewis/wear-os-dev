@@ -1,4 +1,4 @@
-package watchfacetest.ninedof.com.watchfacetest;
+package com.wordpress.ninedof.beamupwear;
 
 import android.animation.ValueAnimator;
 import android.graphics.Canvas;
