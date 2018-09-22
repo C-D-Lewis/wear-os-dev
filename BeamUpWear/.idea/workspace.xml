@@ -59,8 +59,8 @@
       <file leaf-file-name="BeamUpWatchface.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/app/src/main/java/com/wordpress/ninedof/beamupwear/BeamUpWatchface.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="0">
-              <caret line="0" column="41" lean-forward="false" selection-start-line="0" selection-start-column="41" selection-end-line="0" selection-end-column="41" />
+            <state relative-caret-position="325">
+              <caret line="233" column="54" lean-forward="false" selection-start-line="233" selection-start-column="54" selection-end-line="233" selection-end-column="54" />
               <folding />
             </state>
           </provider>
@@ -73,6 +73,7 @@
       <find>ninedo</find>
       <find>com.nine</find>
       <find>watchfacetest.ninedof.com</find>
+      <find>Visi</find>
     </findStrings>
   </component>
   <component name="GradleLocalSettings">
@@ -2415,8 +2416,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/app/src/main/java/com/wordpress/ninedof/beamupwear/BeamUpWatchface.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="41" lean-forward="false" selection-start-line="0" selection-start-column="41" selection-end-line="0" selection-end-column="41" />
+        <state relative-caret-position="325">
+          <caret line="233" column="54" lean-forward="false" selection-start-line="233" selection-start-column="54" selection-end-line="233" selection-end-column="54" />
           <folding />
         </state>
       </provider>

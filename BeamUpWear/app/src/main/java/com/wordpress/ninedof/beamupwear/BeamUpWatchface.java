@@ -212,7 +212,7 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
         public void onTimeTick() {
             super.onTimeTick();
 
-            onTimeUpdate();
+            onTimeUpdate(System.currentTimeMillis());
         }
 
         @Override
@@ -224,6 +224,17 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
         @Override
         public void onVisibilityChanged(boolean visible) {
             super.onVisibilityChanged(visible);
+
+            if (visible) {
+                // Pretend it was the last % 15 seconds
+                long millis = System.currentTimeMillis();
+                mCalendar.setTimeInMillis(millis);
+                while (mCalendar.get(Calendar.SECOND) % 15 != 0) {
+                    millis -= 500;
+                    mCalendar.setTimeInMillis(millis);
+                }
+                onTimeUpdate(millis);
+            }
 
             mCalendar.setTimeZone(TimeZone.getDefault());
             updateTimerIsRunning();
@@ -238,8 +249,8 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
         }
 
         // Either on tick or on timer update
-        private void onTimeUpdate() {
-            mCalendar.setTimeInMillis(System.currentTimeMillis());
+        private void onTimeUpdate(long millis) {
+            mCalendar.setTimeInMillis(millis);
             int seconds = mCalendar.get(Calendar.SECOND);
 
             ValueAnimator animation = null;
@@ -310,7 +321,7 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             invalidate();
 
             if (isInteractive()) {
-                onTimeUpdate();
+                onTimeUpdate(System.currentTimeMillis());
 
                 // Schedule next update
                 long delayMs = UPDATE_RATE_MS - (System.currentTimeMillis() % UPDATE_RATE_MS);
