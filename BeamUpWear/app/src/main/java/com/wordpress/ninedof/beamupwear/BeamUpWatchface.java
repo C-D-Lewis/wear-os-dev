@@ -101,8 +101,6 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
-            Log.d(TAG, "onCreate");
-
             setWatchFaceStyle(new WatchFaceStyle.Builder(BeamUpWatchface.this).build());
 
             mCalendar = Calendar.getInstance(TimeZone.getDefault());
@@ -157,7 +155,6 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
-            Log.d(TAG, "onSurfaceChanged");
 
             mSurfaceWidth = width;
             mSurfaceHeight = height;
@@ -168,7 +165,6 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
         @Override
         public void onApplyWindowInsets(WindowInsets insets) {
             super.onApplyWindowInsets(insets);
-            Log.d(TAG, "onApplyWindowInsets");
 
             mIsRound = insets.isRound();
             calculateSizeMetrics();
@@ -228,11 +224,13 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             if (visible) {
                 // Pretend it was the last % 15 seconds
                 long millis = System.currentTimeMillis();
+                Log.d(TAG, "seconds before " + mCalendar.get(Calendar.SECOND));
                 mCalendar.setTimeInMillis(millis);
                 while (mCalendar.get(Calendar.SECOND) % 15 != 0) {
                     millis -= 500;
                     mCalendar.setTimeInMillis(millis);
                 }
+                Log.d(TAG, "seconds after " + mCalendar.get(Calendar.SECOND));
                 onTimeUpdate(millis);
             }
 
@@ -263,7 +261,7 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
                     animation = ValueAnimator.ofInt(mBarRect.right, 0);
                     break;
                 case 15:
-                    animation = ValueAnimator.ofInt(0, mSurfaceWidth / 4);
+                    animation = ValueAnimator.ofInt(mBarRect.right, mSurfaceWidth / 4);
                     break;
                 case 30:
                     animation = ValueAnimator.ofInt(mBarRect.right, mSurfaceWidth / 2);
