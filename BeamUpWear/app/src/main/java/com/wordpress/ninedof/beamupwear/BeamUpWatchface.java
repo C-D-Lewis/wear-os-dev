@@ -13,6 +13,7 @@ import android.os.Message;
 import android.support.v4.content.res.ResourcesCompat;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
@@ -23,13 +24,14 @@ import java.util.concurrent.TimeUnit;
 
 public class BeamUpWatchface extends CanvasWatchFaceService {
 
+    private static final String TAG = BeamUpWatchface.class.getSimpleName();
     private static final long UPDATE_RATE_MS = TimeUnit.SECONDS.toMillis(1);
     private static final int MSG_UPDATE_TIME = 0;
 
     private static int DIRTY_WHITE = Color.rgb(200, 200, 200);
     private static final int
-        BAR_ANIM_DURATION = 500, DIGIT_ANIM_DURATION = 300, BEAM_ANIM_DURATION = 300,
-        DIGIT_DELAY = 500, ANIM_MID_DELAY = 300,
+        BAR_ANIM_DURATION = 500, DIGIT_ANIM_DURATION = 300, BEAM_ANIM_DURATION = DIGIT_ANIM_DURATION,
+        DIGIT_DELAY = 300,
         NUM_DIGITS = 4, BAR_HEIGHT = 10,
         SEPARATION = 5,
         TIME_SIZE_ROUND = 100, TIME_SIZE_SQUARE = 90,
@@ -42,7 +44,7 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
 
     private class Engine extends CanvasWatchFaceService.Engine {
 
-        private final Handler mUpdateHandler = new UpdateHandler(this);
+        private final Handler mUpdateHandler = new InteractiveUpdateHandler(this);
         private Calendar mCalendar;
         private Paint mTimePaint, mDatePaint;
 
@@ -83,24 +85,31 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             mTimePaint.setTextSize(mIsRound ? TIME_SIZE_ROUND : TIME_SIZE_SQUARE);
             mDatePaint.setTextSize(mIsRound ? DATE_SIZE_ROUND : DATE_SIZE_SQUARE);
 
+            // Font metrics
             Rect bounds = new Rect();
             mTimePaint.getTextBounds("0", 0, 1, bounds);
-            mTimeSize = bounds.right;
+            mTimeSize = bounds.right; //(mIsRound ? 8 : 0);
             mTimePaint.getTextBounds(":", 0, 1, bounds);
             mColonSize = bounds.right;
             mDatePaint.getTextBounds("0", 0, 1, bounds);
             mDateSize = bounds.right;
 
+            // Time bounds rect
             int totalWidth = (4 * mTimeSize) + mColonSize + (4 * SEPARATION);
             mTimeBounds.left = (mSurfaceWidth - totalWidth) / 2;
             mTimeBounds.top = (mSurfaceHeight - mTimeSize) / 2;
             mTimeBounds.right = mTimeBounds.left + totalWidth;
             mTimeBounds.bottom = mTimeBounds.top + mTimeSize;
 
+            // Bar
             mBar.bounds.top = mTimeBounds.top + mTimeSize + SEPARATION;
             mBar.bounds.bottom = mBar.bounds.top + BAR_HEIGHT;
 
+            // Digits
             for (int i = 0; i < NUM_DIGITS; i++) mDigits[i].yPosition = mTimeBounds.top + mTimeSize;
+
+            // Beam metrics
+            for (int i = 0; i < NUM_DIGITS; i++) mBeams[i].updateMetrics();
         }
 
         @Override
@@ -136,6 +145,10 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
                     break;
                 case 1:
                     mBar.animateReturn();
+
+                    for (int i = 0; i < NUM_DIGITS; i++) {
+                        mDigits[i].color = Color.WHITE;
+                    }
                     break;
                 case 15:
                     mBar.animateFirstQuarter();
@@ -151,6 +164,13 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
                     beginMinuteAnimation();
                 default: break;
             }
+
+            // Enable for testing beam alignment
+//            for (int i = 0; i < NUM_DIGITS; i += 1) {
+//                mBeams[i].bounds.bottom = 1000;
+//                mBeams[i].color = DIRTY_WHITE;
+//                mDigits[i].value = 8;
+//            }
         }
 
         @Override
@@ -160,7 +180,6 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             mSurfaceWidth = width;
             mSurfaceHeight = height;
             calculateSizeMetrics();
-            for (int i = 0; i < NUM_DIGITS; i++) mBeams[i].updateMetrics();
         }
 
         @Override
@@ -171,29 +190,29 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             calculateSizeMetrics();
         }
 
-        private boolean[] calculateChanges() {
-            boolean[] result = new boolean[4];
+        private boolean[] updateDigitChanges() {
+            boolean[] changes = new boolean[4];
             if ((mDigits[0].value == 0 && mDigits[1].value == 9 && mDigits[2].value == 5 && mDigits[3].value == 9) ||
                     (mDigits[0].value == 1 && mDigits[1].value == 9 && mDigits[2].value == 5 && mDigits[3].value == 9) ||
                     (mDigits[0].value == 2 && mDigits[1].value == 3 && mDigits[2].value == 5 && mDigits[3].value == 9)) {
-                result[0] = true;
+                changes[0] = true;
             }
             if (mDigits[2].value == 5 && mDigits[3].value == 9) {
-                result[1] = true;
+                changes[1] = true;
             }
             if (mDigits[3].value == 9) {
-                result[2] = true;
+                changes[2] = true;
             }
-            result[3] = true;
-            return result;
+            changes[3] = true;
+            return changes;
         }
 
         private void beginMinuteAnimation() {
-            boolean[] changes = calculateChanges();
+            boolean[] changes = updateDigitChanges();
             for (int i = 0; i < NUM_DIGITS; i++) {
                 if (changes[i])  {
-                    mBeams[i].animateDown();
-                    mDigits[i].animateUp();
+                    mBeams[i].beginAnimationSequence();
+                    mDigits[i].beginAnimationSequence();
                 }
             }
         }
@@ -277,22 +296,35 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             }
         }
 
+
+        // -------- Timeline -----------------------------------
+        // 59.0 s x Bar to 4/4
+        //        - Beam animations, digit animations scheduled
+        // 0s     x Time change
+        // 1s     x Bar to 0/4
+        //
+        //--------- Transitions --------------------------------
+        // Time (59s) | Event
+        // T+0         | Beam DOWN (300)
+        // T+500       | Digit UP (300)
+        //   DUP+400   | Digit Down (300)
+        // BDN+1400    | Beam UP (300)
+
         private class BeamUpBeam {
-            ValueAnimator animation;
-            ValueAnimator.AnimatorUpdateListener animationUpdateListener;
-            Handler animChainHandler = new Handler();
+            ValueAnimator downAnimation, upAnimation;
+            ValueAnimator.AnimatorUpdateListener updateListener;
             Rect bounds = new Rect();
             Paint paint = new Paint();
             int index;
+            int color = Color.WHITE;
 
             BeamUpBeam(int index) {
                 this.index = index;
 
                 updateMetrics();
-                paint.setColor(Color.WHITE);
                 paint.setStyle(Paint.Style.FILL);
 
-                animationUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
+                updateListener = new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
                         bounds.bottom = (int) animation.getAnimatedValue();
@@ -302,10 +334,13 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
             }
 
             void updateMetrics() {
-                int x = mTimeBounds.left + (mIsRound ? (4 * SEPARATION) : (3 * SEPARATION));
+                int x = mTimeBounds.left + 2;
+                if (!mIsRound) {
+                    x -= (SEPARATION - 2);
+                }
                 switch (this.index) {
                     case 1:
-                        x += mTimeSize + SEPARATION;
+                        x += mTimeSize + (1 * SEPARATION);
                         break;
                     case 2:
                         x += (2 * mTimeSize) + (3 * SEPARATION) + mColonSize;
@@ -319,52 +354,46 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
                 bounds.right = bounds.left + mTimeSize;
             }
 
-            void animateUp() {
-                animation = ValueAnimator.ofInt(bounds.bottom, 0);
-                animation.setDuration(DIGIT_ANIM_DURATION);
-                animation.setStartDelay(DIGIT_DELAY);
-                beginAnimation();
-            }
-
-            void animateDown() {
-                animation = ValueAnimator.ofInt(bounds.bottom, mTimeBounds.top + mTimeSize);
-                animation.setDuration(DIGIT_ANIM_DURATION);
-                animation.addListener(new AnimatorListenerAdapter() {
+            void beginAnimationSequence() {
+                downAnimation = ValueAnimator.ofInt(bounds.bottom, mTimeBounds.top + mTimeSize);
+                downAnimation.setStartDelay(0);
+                downAnimation.setDuration(BEAM_ANIM_DURATION);
+                downAnimation.addListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
                         super.onAnimationEnd(animation);
-                        animChainHandler.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                animateUp();
-                            }
-                        }, 3 * ANIM_MID_DELAY);
+
+                        // Schedule up
+                        upAnimation = ValueAnimator.ofInt(bounds.bottom, 0);
+                        upAnimation.setStartDelay(1400);
+                        upAnimation.setDuration(BEAM_ANIM_DURATION);
+                        beginAnimation(upAnimation);
                     }
                 });
-                beginAnimation();
+                beginAnimation(downAnimation);
             }
 
-            void beginAnimation() {
+            void beginAnimation(ValueAnimator animation) {
                 animation.start();
-                animation.addUpdateListener(animationUpdateListener);
+                animation.addUpdateListener(updateListener);
             }
 
             void draw(Canvas canvas) {
+                paint.setColor(color);
                 canvas.drawRect(bounds, paint);
             }
         }
 
         private class BeamUpDigit {
-            ValueAnimator animation;
-            ValueAnimator.AnimatorUpdateListener animationUpdateListener;
-            Handler animChainHandler = new Handler();
+            ValueAnimator downAnimation, upAnimation;
+            ValueAnimator.AnimatorUpdateListener updateListener;
             int index, color, value, yPosition;
 
             BeamUpDigit(int index) {
                 color = Color.WHITE;
                 this.index = index;
 
-                animationUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
+                updateListener = new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
                         yPosition = (int) animation.getAnimatedValue();
@@ -373,47 +402,49 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
                 };
             }
 
-            void animateUp() {
-                animation = ValueAnimator.ofInt(yPosition, -mTimeSize);
+            void beginAnimationSequence() {
+                upAnimation = ValueAnimator.ofInt(yPosition, -mTimeSize);
+                upAnimation.setStartDelay(450);
+                upAnimation.setDuration(DIGIT_ANIM_DURATION);
 
-                animation.setStartDelay(DIGIT_DELAY);
-                animation.addListener(new AnimatorListenerAdapter() {
+                upAnimation.addListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationStart(Animator animation) {
                         super.onAnimationStart(animation);
+
                         color = Color.BLACK;
                     }
 
                     @Override
                     public void onAnimationEnd(Animator animation) {
                         super.onAnimationEnd(animation);
-                        animChainHandler.postDelayed(new Runnable() {
+
+                        // Schedule down
+                        downAnimation = ValueAnimator.ofInt(yPosition, mTimeBounds.top + mTimeSize);
+                        downAnimation.setStartDelay(400);
+                        downAnimation.setDuration(DIGIT_ANIM_DURATION);
+                        downAnimation.addListener(new AnimatorListenerAdapter() {
                             @Override
-                            public void run() {
-                                animateDown();
+                            public void onAnimationEnd(Animator animation) {
+                                super.onAnimationEnd(animation);
+
+                                mUpdateHandler.postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        color = Color.WHITE;
+                                    }
+                                }, 200);
                             }
-                        }, ANIM_MID_DELAY);
+                        });
+                        beginAnimation(downAnimation);
                     }
                 });
-                beginAnimation();
+                beginAnimation(upAnimation);
             }
 
-            void animateDown() {
-                animation = ValueAnimator.ofInt(yPosition, mTimeBounds.top + mTimeSize);
-                animation.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        super.onAnimationEnd(animation);
-                        color = Color.WHITE;
-                    }
-                });
-                beginAnimation();
-            }
-
-            void beginAnimation() {
+            void beginAnimation(ValueAnimator animation) {
                 animation.start();
-                animation.setDuration(DIGIT_ANIM_DURATION);
-                animation.addUpdateListener(animationUpdateListener);
+                animation.addUpdateListener(updateListener);
             }
 
             void draw(Canvas canvas) {
@@ -494,11 +525,11 @@ public class BeamUpWatchface extends CanvasWatchFaceService {
 
     }
 
-    private static class UpdateHandler extends Handler {
+    private static class InteractiveUpdateHandler extends Handler {
 
         private final BeamUpWatchface.Engine engine;
 
-        UpdateHandler(BeamUpWatchface.Engine engine) {
+        InteractiveUpdateHandler(BeamUpWatchface.Engine engine) {
             this.engine = engine;
         }
 
